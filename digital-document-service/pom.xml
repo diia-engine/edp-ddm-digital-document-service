@@ -55,9 +55,12 @@
       <version>${ddm-starter-security.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.epam.digital.data.platform</groupId>
-      <artifactId>ddm-starter-actuator</artifactId>
-      <version>${ddm-starter-actuator.version}</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
@@ -76,8 +79,8 @@
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
-      <artifactId>ddm-starter-validation</artifactId>
-      <version>${ddm-starter-validation.version}</version>
+      <artifactId>ddm-form-validation-client</artifactId>
+      <version>${ddm-form-validation-client.version}</version>
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
