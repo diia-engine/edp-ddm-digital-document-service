@@ -31,6 +31,9 @@
     <ddm-starter-kafka.version>1.6.0</ddm-starter-kafka.version>
     <ddm-file-storage.version>1.9.0</ddm-file-storage.version>
 
+    <!-- JMX port of spring-boot-maven-plugin start/stop; override locally if 9001 is taken -->
+    <spring-boot.jmx.port>9001</spring-boot.jmx.port>
+
     <apache.commons.io.version>2.11.0</apache.commons.io.version>
     <apache.tika.version>2.7.0</apache.tika.version>
     <jackson-databind.version>2.13.4</jackson-databind.version>

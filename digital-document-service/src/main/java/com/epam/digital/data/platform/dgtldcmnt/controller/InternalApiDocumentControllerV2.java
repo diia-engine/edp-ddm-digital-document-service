@@ -50,7 +50,7 @@ public class InternalApiDocumentControllerV2 {
   @PostMapping("/{rootProcessInstanceId}")
   @Operation(summary = "Upload MultiPart document",
       description = "### Endpoint purpose:\n This endpoint allows to upload a document as part of a specified process instance. It accepts a multi-part file and an optional file name. The uploaded document's metadata is returned upon successful storage.\n"
-          + "### Validation:\n The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. For batch file uploads, the total file size should not exceed the expected limit. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
+          + "### Validation:\n The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. For batch file uploads, the total file size should not exceed the expected limit. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S, AVI, MPG/MPEG, MP3, MP4/M4A. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
       parameters = @Parameter(
           in = ParameterIn.HEADER,
           name = "X-Access-Token",

@@ -190,6 +190,7 @@
             </goals>
             <configuration>
 <!--          <fork>false</fork> Fixes Windows issue: The filename or extension is too long-->
+              <jmxPort>${spring-boot.jmx.port}</jmxPort>
               <useTestClasspath>true</useTestClasspath>
               <directories>${project.build.testOutputDirectory}</directories>
               <mainClass>com.epam.digital.data.platform.dgtldcmnt.TestApp</mainClass>
@@ -201,6 +202,9 @@
             <goals>
               <goal>stop</goal>
             </goals>
+            <configuration>
+              <jmxPort>${spring-boot.jmx.port}</jmxPort>
+            </configuration>
           </execution>
         </executions>
       </plugin>

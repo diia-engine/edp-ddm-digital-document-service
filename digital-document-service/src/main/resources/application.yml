@@ -36,6 +36,10 @@ management:
       enabled: true
     kafka:
       enabled: false
+    # digital-document-service не використовує Redis: spring-data-redis приїжджає транзитивно
+    # з ddm-form-data-storage, і штатний RedisHealthIndicator тримає /actuator/health у DOWN.
+    redis:
+      enabled: false
 
 springdoc:
   swagger-ui:
