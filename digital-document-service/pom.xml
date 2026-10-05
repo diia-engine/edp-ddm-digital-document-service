@@ -55,9 +55,12 @@
       <version>${ddm-starter-security.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.epam.digital.data.platform</groupId>
-      <artifactId>ddm-starter-actuator</artifactId>
-      <version>${ddm-starter-actuator.version}</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
@@ -76,8 +79,8 @@
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
-      <artifactId>ddm-starter-validation</artifactId>
-      <version>${ddm-starter-validation.version}</version>
+      <artifactId>ddm-form-validation-client</artifactId>
+      <version>${ddm-form-validation-client.version}</version>
     </dependency>
     <dependency>
       <groupId>com.epam.digital.data.platform</groupId>
@@ -187,6 +190,7 @@
             </goals>
             <configuration>
 <!--          <fork>false</fork> Fixes Windows issue: The filename or extension is too long-->
+              <jmxPort>${spring-boot.jmx.port}</jmxPort>
               <useTestClasspath>true</useTestClasspath>
               <directories>${project.build.testOutputDirectory}</directories>
               <mainClass>com.epam.digital.data.platform.dgtldcmnt.TestApp</mainClass>
@@ -198,6 +202,9 @@
             <goals>
               <goal>stop</goal>
             </goals>
+            <configuration>
+              <jmxPort>${spring-boot.jmx.port}</jmxPort>
+            </configuration>
           </execution>
         </executions>
       </plugin>

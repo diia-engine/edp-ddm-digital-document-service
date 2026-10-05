@@ -20,6 +20,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.epam.digital.data.platform.dgtldcmnt.dto.DocumentDto;
@@ -28,15 +29,20 @@ import com.epam.digital.data.platform.dgtldcmnt.dto.GetDocumentDto;
 import com.epam.digital.data.platform.dgtldcmnt.dto.GetDocumentsMetadataDto;
 import com.epam.digital.data.platform.dgtldcmnt.dto.UploadDocumentFromUserFormDto;
 import com.epam.digital.data.platform.dgtldcmnt.mapper.DocumentMetadataDtoMapper;
+import com.epam.digital.data.platform.storage.file.dto.BaseFileMetadataDto;
 import com.epam.digital.data.platform.storage.file.dto.FileDataDto;
 import com.epam.digital.data.platform.storage.file.dto.FileMetadataDto;
+import com.epam.digital.data.platform.storage.file.dto.FileObjectDto;
 import com.epam.digital.data.platform.storage.file.exception.FileNotFoundException;
+import com.epam.digital.data.platform.storage.file.service.FileStorageService;
 import com.epam.digital.data.platform.storage.file.service.FormDataFileStorageService;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +58,8 @@ class CephDocumentServiceTest {
 
   @Mock
   private FormDataFileStorageService fromDataFileStorageService;
+  @Mock
+  private FileStorageService fileStorageService;
   @Spy
   private DocumentMetadataDtoMapper mapper = Mappers.getMapper(DocumentMetadataDtoMapper.class);
 
@@ -69,43 +77,66 @@ class CephDocumentServiceTest {
 
   @BeforeEach
   public void init() {
-    service = new CephDocumentService(fromDataFileStorageService, mapper);
+    service = new CephDocumentService(fromDataFileStorageService, fileStorageService, mapper,
+        List.of());
   }
 
   @Test
   void testPutDocument() {
+    var data = "file content".getBytes();
     var is = new BufferedInputStream(new ByteArrayInputStream(data));
-    var testObjectMetaData = FileMetadataDto.builder()
-        .contentLength(contentLength)
-        .contentType(contentType)
-        .build();
+    var formKey = "testFormKey";
     var uploadDto = UploadDocumentFromUserFormDto.builder()
         .rootProcessInstanceId(rootProcessInstanceId)
         .originRequestUrl(originRequestUrl)
         .contentType(contentType)
         .fieldName(fieldName)
+        .formKey(formKey)
         .fileInputStream(is)
         .filename(filename)
+        .size((long) data.length)
         .taskId(taskId)
         .build();
 
-    ArgumentCaptor<FileDataDto> captor = ArgumentCaptor.forClass(FileDataDto.class);
-    when(fromDataFileStorageService.save(eq(rootProcessInstanceId), anyString(),
-        captor.capture())).thenReturn(testObjectMetaData);
+    var saveCaptor = ArgumentCaptor.forClass(FileObjectDto.class);
+    var streamedContent = new byte[1][];
+    when(fileStorageService.save(eq(rootProcessInstanceId), anyString(), saveCaptor.capture()))
+        .thenAnswer(invocation -> {
+          // the storage reads the stream the same way the S3 client does on upload
+          streamedContent[0] = saveCaptor.getValue().getContent().readAllBytes();
+          return saveCaptor.getValue().getMetadata();
+        });
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> userMetadataCaptor = ArgumentCaptor.forClass(Map.class);
+    when(fileStorageService.setUserMetadata(eq(rootProcessInstanceId), anyString(),
+        userMetadataCaptor.capture()))
+        .thenAnswer(invocation -> new BaseFileMetadataDto(contentLength, contentType,
+            userMetadataCaptor.getValue()));
 
     var savedDocMetadata = service.put(uploadDto);
+
+    var savedFile = saveCaptor.getValue();
+    assertThat(streamedContent[0]).isEqualTo(data);
+    assertThat(savedFile.getMetadata().getContentLength()).isEqualTo(data.length);
+    assertThat(savedFile.getMetadata().getContentType()).isEqualTo(contentType);
+
+    var userMetadata = new FileMetadataDto(contentLength, contentType,
+        userMetadataCaptor.getValue());
+    var expectedChecksum = DigestUtils.sha256Hex(data);
+    assertThat(userMetadata.getId()).isNotEmpty();
+    assertThat(userMetadata.getChecksum()).isEqualTo(expectedChecksum);
+    assertThat(userMetadata.getFilename()).isEqualTo(filename);
+    assertThat(userMetadata.getFieldName()).isEqualTo(fieldName);
+    assertThat(userMetadata.getFormKey()).isEqualTo(formKey);
+    verify(fileStorageService).setUserMetadata(rootProcessInstanceId, userMetadata.getId(),
+        userMetadataCaptor.getValue());
 
     assertThat(savedDocMetadata).isNotNull();
     assertThat(savedDocMetadata.getType()).isEqualTo(contentType);
     assertThat(savedDocMetadata.getSize()).isEqualTo(contentLength);
     assertThat(savedDocMetadata.getName()).isEqualTo(filename);
-    FileMetadataDto userMetadata = captor.getValue().getMetadata();
-    assertThat(userMetadata.getId()).isNotEmpty();
-    assertThat(userMetadata.getChecksum()).isNotEmpty();
-    assertThat(userMetadata.getFilename()).isEqualTo(filename);
-    assertThat(savedDocMetadata.getChecksum()).isEqualTo(userMetadata.getChecksum());
+    assertThat(savedDocMetadata.getChecksum()).isEqualTo(expectedChecksum);
     assertThat(savedDocMetadata.getId()).isEqualTo(userMetadata.getId());
-    assertThat(savedDocMetadata.getUrl()).contains(userMetadata.getId());
     var expectedUrl = UriComponentsBuilder.newInstance().scheme("https").host(originRequestUrl)
         .pathSegment("documents")
         .pathSegment(rootProcessInstanceId)

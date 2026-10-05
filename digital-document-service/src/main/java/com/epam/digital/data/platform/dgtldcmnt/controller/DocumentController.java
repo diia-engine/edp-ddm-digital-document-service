@@ -33,12 +33,14 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import javax.servlet.annotation.MultipartConfig;
 import javax.validation.Valid;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -85,7 +87,7 @@ public class DocumentController {
   @Operation(summary = "Upload document in business process",
       description = "### Endpoint purpose:\n This endpoint allows to upload a document as part of a specified process instance and task. It accepts a multi-part file and associated parameters, such as the task ID, form field name, and an optional file name. The uploaded document's metadata is returned upon successful storage.\n"
           + "### Authorization:\n This endpoint requires valid user authentication. To access this endpoint, the request must include a valid access token in the _X-Access-Token_ header, otherwise, the API will return a _401 Unauthorized_ status code. Also if _rootProcessInstanceId_ not in task, which retrieved by _taskId_, or task is suspended, or assignee of task is not the same as provided in _X-Access-Token_ then _403_ status code returned.\n"
-          + "### Validation:\n This endpoint requires a valid _fieldName_. If the provided field name is not found in the form related to the user task retrieved by _taskId_, a _422_ status code is returned. The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. For batch file uploads, the total file size should not exceed the expected limit. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
+          + "### Validation:\n This endpoint requires a valid _fieldName_. If the provided field name is not found in the form related to the user task retrieved by _taskId_, a _422_ status code is returned. The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. For batch file uploads, the total file size should not exceed the expected limit. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S, AVI, MPG/MPEG, MP3, MP4/M4A, ZIP. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
       parameters = @Parameter(
           in = ParameterIn.HEADER,
           name = "X-Access-Token",
@@ -143,6 +145,9 @@ public class DocumentController {
       @PathVariable("fieldName") String fieldName,
       @RequestParam("file") MultipartFile file,
       @RequestParam(required = false, name = "filename") String filename,
+      @RequestParam(required = false, name = "imageMaxWidth") Integer imageMaxWidth,
+      @RequestParam(required = false, name = "imageMaxHeight") Integer imageMaxHeight,
+      @RequestParam(required = false, name = "compressionQuality") Integer compressionQuality,
       Authentication authentication) throws IOException {
     var uploadDocumentDto = UploadDocumentFromUserFormDto.builder()
         .filename(Objects.isNull(filename) ? file.getOriginalFilename() : filename)
@@ -153,6 +158,9 @@ public class DocumentController {
         .fieldName(fieldName)
         .size(file.getSize())
         .taskId(taskId)
+        .imageMaxWidth(imageMaxWidth)
+        .imageMaxHeight(imageMaxHeight)
+        .compressionQuality(compressionQuality)
         .build();
     return documentFacade.validateAndPut(uploadDocumentDto, authentication);
   }
@@ -331,7 +339,7 @@ public class DocumentController {
           @ApiResponse(
               description = "Documents deleted successfully.",
               responseCode = "200"
-              ),
+          ),
           @ApiResponse(
               responseCode = "401",
               description = "Unauthorized",
@@ -389,10 +397,10 @@ public class DocumentController {
       }
   )
   public void deleteByFileId(@PathVariable("rootProcessInstanceId") String rootProcessInstanceId,
-      @PathVariable("taskId") String taskId,
-      @PathVariable("fieldName") String fieldName,
-      @PathVariable("fileId") String fileId,
-      Authentication authentication) {
+                             @PathVariable("taskId") String taskId,
+                             @PathVariable("fieldName") String fieldName,
+                             @PathVariable("fileId") String fileId,
+                             Authentication authentication) {
     var deleteDocumentDto = DeleteDocumentDto.builder()
         .rootProcessInstanceId(rootProcessInstanceId)
         .fieldName(fieldName)

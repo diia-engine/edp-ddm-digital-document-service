@@ -71,7 +71,25 @@ class AllowedUploadedDocumentValidatorTest {
       "application/pkcs7-signature,file.docx.p7s,application/pkcs7-signature",
       "application/pkcs7-signature,file.docx.p7s,application/octet-stream",
       "application/octet-stream,file.pdf.asics,application/octet-stream",
-      "application/vnd.etsi.asic-s+zip,file.pdf.asics,application/octet-stream"
+      "application/vnd.etsi.asic-s+zip,file.pdf.asics,application/octet-stream",
+      "video/x-msvideo,movie.avi,video/x-msvideo",
+      "video/x-msvideo,movie.AVI,video/x-msvideo",
+      "video/x-msvideo,movie.avi,video/avi",
+      "video/x-msvideo,movie.avi,video/msvideo",
+      "video/mpeg,movie.mpg,video/mpeg",
+      "video/mpeg,movie.mpeg,video/mpeg",
+      "video/mpeg,movie.mpg,video/mpg",
+      "audio/mpeg,song.mp3,audio/mpeg",
+      "audio/mpeg,song.mp3,audio/mp3",
+      "audio/mpeg,song.mp3,audio/x-mpeg",
+      "video/mp4,clip.mp4,video/mp4",
+      "audio/mp4,song.m4a,audio/mp4",
+      "audio/mp4,song.m4a,audio/x-m4a",
+      "audio/mp4,clip.mp4,video/mp4",
+      "video/mp4,song.m4a,audio/mp4",
+      "application/zip,archive.zip,application/zip",
+      "application/zip,archive.ZIP,application/zip",
+      "application/zip,archive.zip,application/x-zip-compressed"
   })
   @SneakyThrows
   void validate_success(String detectedContentType, String filename, String inputContentType) {
@@ -95,7 +113,16 @@ class AllowedUploadedDocumentValidatorTest {
       "file.xml,application/xml",
       "file.json,application/json",
       "file.exe,application/vnd.microsoft.portable-executable",
-      "file.bat,application/bat"
+      "file.bat,application/bat",
+      "file.mkv,video/x-matroska",
+      "file.mov,video/quicktime",
+      "file.wav,audio/x-wav",
+      "file.ogg,audio/ogg",
+      "file.webm,video/webm",
+      "file.7z,application/x-7z-compressed",
+      "file.rar,application/vnd.rar",
+      "file.tar.gz,application/gzip",
+      "file.zip,application/zip-compressed"
   })
   @SneakyThrows
   void validate_unsupportedMediaType(String filename, String inputContentType) {
@@ -178,7 +205,16 @@ class AllowedUploadedDocumentValidatorTest {
       "file.jpeg.pdf,image/jpeg",
       "file.gif,image/jpeg",
       "file.exe,image/png",
-      "file.txt,text/csv"
+      "file.txt,text/csv",
+      "file.mkv,video/x-msvideo",
+      "file.avi,video/mpeg",
+      "file.mpe,video/mpeg",
+      "file.mp3,video/mp4",
+      "file.m4a,video/x-msvideo",
+      "file.rar,application/zip",
+      "file.docx,application/zip",
+      "file.zip.pdf,application/x-zip-compressed",
+      "file.zip,application/octet-stream"
   })
   @SneakyThrows
   void validate_invalidExtension(String filename, String inputContentType) {
@@ -207,7 +243,15 @@ class AllowedUploadedDocumentValidatorTest {
       "application/vnd.microsoft.portable-executable,file.jpeg,image/jpeg",
       "application/bat,file.jpg,image/jpeg",
       "application/pkcs7-signature,file.png,image/png",
-      "text/plain,file.csv,text/csv"
+      "text/plain,file.csv,text/csv",
+      "video/x-matroska,movie.avi,video/x-msvideo",
+      "audio/mpeg,movie.mp4,video/mp4",
+      "application/pdf,song.mp3,audio/mpeg",
+      "video/x-msvideo,movie.mpg,video/mpeg",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document,archive.zip,application/zip",
+      "application/vnd.etsi.asic-s+zip,archive.zip,application/zip",
+      "application/java-archive,archive.zip,application/x-zip-compressed",
+      "application/zip,file.pdf.asics,application/octet-stream"
   })
   @SneakyThrows
   void validate_invalidDetectedContentType(String detectedContentType, String filename,
