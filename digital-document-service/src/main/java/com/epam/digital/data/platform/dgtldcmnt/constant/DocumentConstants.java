@@ -38,11 +38,18 @@ public final class DocumentConstants {
   public static final String MP4_AUDIO_TYPE = "audio/mp4";
 
   /**
+   * Canonical media type of a ZIP archive. Tika looks inside a ZIP container and reports the most
+   * specific subtype it recognises, so an OOXML document, an ASiC container or a JAR renamed to
+   * {@code .zip} is detected as its own type and rejected - only a plain archive matches this one.
+   */
+  public static final String ZIP_TYPE = "application/zip";
+
+  /**
    * Input {@code Content-Type} to the file extensions accepted for it.
    *
-   * <p>Multimedia formats are listed together with the legacy media types browsers and operating
-   * systems still send for them ({@code video/avi}, {@code video/mpg}, {@code audio/mp3}...).
-   * A request carrying an unknown {@code Content-Type} is rejected with 415 before its content is
+   * <p>Multimedia and archive formats are listed together with the legacy media types browsers and
+   * operating systems still send for them ({@code video/avi}, {@code video/mpg}, {@code audio/mp3},
+   * {@code application/x-zip-compressed} sent by Windows...). A request carrying an unknown {@code Content-Type} is rejected with 415 before its content is
    * ever read, so every alias a client may send has to be a key here.
    */
   public static final Map<String, Set<String>> MEDIA_TYPE_TO_EXTENSIONS_MAP = Map.ofEntries(
@@ -66,7 +73,10 @@ public final class DocumentConstants {
 
       Map.entry(MP4_VIDEO_TYPE, Set.of("mp4")),
       Map.entry(MP4_AUDIO_TYPE, Set.of("m4a", "mp4")),
-      Map.entry("audio/x-m4a", Set.of("m4a", "mp4"))
+      Map.entry("audio/x-m4a", Set.of("m4a", "mp4")),
+
+      Map.entry(ZIP_TYPE, Set.of("zip")),
+      Map.entry("application/x-zip-compressed", Set.of("zip"))
   );
 
   public static final List<MediaType> SUPPORTED_MEDIA_TYPES = MEDIA_TYPE_TO_EXTENSIONS_MAP.keySet()
@@ -97,7 +107,9 @@ public final class DocumentConstants {
 
       Map.entry("audio/x-m4a", Set.of(MP4_AUDIO_TYPE)),
       Map.entry(MP4_VIDEO_TYPE, Set.of(MP4_AUDIO_TYPE)),
-      Map.entry(MP4_AUDIO_TYPE, Set.of(MP4_VIDEO_TYPE))
+      Map.entry(MP4_AUDIO_TYPE, Set.of(MP4_VIDEO_TYPE)),
+
+      Map.entry("application/x-zip-compressed", Set.of(ZIP_TYPE))
   );
 
   private DocumentConstants() {

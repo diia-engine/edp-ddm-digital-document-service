@@ -69,7 +69,7 @@ public class InternalApiDocumentController {
   @PostMapping("/{rootProcessInstanceId}")
   @Operation(summary = "Upload document",
       description = "### Endpoint purpose:\n This endpoint downloads document from remote URL passed in request body and using root process instance ID to save document. It returns the uploaded document's metadata.\n"
-          + "### Validation:\n The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S, AVI, MPG/MPEG, MP3, MP4/M4A. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
+          + "### Validation:\n The file size should not exceed the system limit; otherwise, a _413 Payload Too Large_ status code is returned. Media type validation accepts the following formats: PDF, PNG, JPG/JPEG, CSV, ASICs, P7S, AVI, MPG/MPEG, MP3, MP4/M4A, ZIP. If a different format is used, a _422 Unprocessable Entity_ status code is returned.",
       parameters = @Parameter(
           in = ParameterIn.HEADER,
           name = "X-Access-Token",

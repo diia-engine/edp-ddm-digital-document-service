@@ -24,6 +24,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import javax.validation.ConstraintValidatorContext;
 import lombok.SneakyThrows;
 import org.apache.tika.Tika;
@@ -46,6 +49,10 @@ import org.mockito.Mockito;
  * derives from content: Tika normalises {@code video/avi} to {@code video/x-msvideo}, and does not
  * know {@code audio/mp3} or {@code video/mpg} at all. Only the headers that drive detection are
  * built here - the payload after them is irrelevant to the detector.
+ *
+ * <p>ZIP archives are the opposite case: Tika looks inside the container and reports the most
+ * specific subtype it recognises, so archives are built as real ZIP files and the containers that
+ * are ZIP underneath (OOXML, ASiC, JAR) must not pass as {@code application/zip}.
  */
 class UploadedDocumentContentDetectionTest {
 
@@ -81,7 +88,21 @@ class UploadedDocumentContentDetectionTest {
         Arguments.of("M4A, macOS alias", m4a(), "song.m4a", "audio/x-m4a"),
         // the same container: an audio-only MP4 named .mp4 is still detected as audio/mp4
         Arguments.of("audio-only MP4 named .mp4", m4a(), "clip.mp4",
-            DocumentConstants.MP4_VIDEO_TYPE)
+            DocumentConstants.MP4_VIDEO_TYPE),
+
+        Arguments.of("ZIP archive", zipWithText(), "archive.zip", DocumentConstants.ZIP_TYPE),
+        Arguments.of("ZIP, Windows alias", zipWithText(), "archive.zip",
+            "application/x-zip-compressed"),
+        Arguments.of("ZIP, uppercase extension", zipWithText(), "archive.ZIP",
+            DocumentConstants.ZIP_TYPE),
+        Arguments.of("ZIP with several documents", zipWithDocuments(), "archive.zip",
+            DocumentConstants.ZIP_TYPE),
+        // only the outer container matters - a nested docx doesn't change the detected type
+        Arguments.of("ZIP with a nested DOCX", zipWithNestedDocx(), "archive.zip",
+            DocumentConstants.ZIP_TYPE),
+        Arguments.of("empty ZIP", emptyZip(), "archive.zip", DocumentConstants.ZIP_TYPE),
+        // ASiC is ZIP underneath; adding ZIP must not break the existing .asics path
+        Arguments.of("ASiC-S as .asics", asicS(), "file.pdf.asics", "application/octet-stream")
     );
   }
 
@@ -103,7 +124,13 @@ class UploadedDocumentContentDetectionTest {
             DocumentConstants.MPEG_VIDEO_TYPE),
         Arguments.of("MP4 declared as MP3", mp4(), "song.mp3",
             DocumentConstants.MPEG_AUDIO_TYPE),
-        Arguments.of("CSV declared as MP3", csv(), "song.mp3", DocumentConstants.MPEG_AUDIO_TYPE)
+        Arguments.of("CSV declared as MP3", csv(), "song.mp3", DocumentConstants.MPEG_AUDIO_TYPE),
+
+        Arguments.of("DOCX renamed to .zip", docx(), "archive.zip", DocumentConstants.ZIP_TYPE),
+        Arguments.of("ASiC-S renamed to .zip", asicS(), "archive.zip", DocumentConstants.ZIP_TYPE),
+        Arguments.of("JAR renamed to .zip", jar(), "archive.zip",
+            "application/x-zip-compressed"),
+        Arguments.of("PDF renamed to .zip", pdf(), "archive.zip", DocumentConstants.ZIP_TYPE)
     );
   }
 
@@ -171,6 +198,100 @@ class UploadedDocumentContentDetectionTest {
 
   private static byte[] csv() {
     return "id,name\n1,first\n2,second\n".getBytes(StandardCharsets.US_ASCII);
+  }
+
+  private static byte[] zipWithText() {
+    return zip(deflated("readme.txt", "plain text"));
+  }
+
+  private static byte[] zipWithDocuments() {
+    return zip(deflated("notes.txt", "plain text"),
+        deflated("table.csv", "id,name\n1,first\n"),
+        new ZipFileEntry("scan.pdf", pdf(), false));
+  }
+
+  private static byte[] zipWithNestedDocx() {
+    return zip(new ZipFileEntry("document.docx", docx(), false));
+  }
+
+  private static byte[] emptyZip() {
+    return zip();
+  }
+
+  /**
+   * OOXML package: Tika recognises it by {@code [Content_Types].xml} being the first entry.
+   */
+  private static byte[] docx() {
+    return zip(deflated("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+            + "<Default Extension=\"rels\" "
+            + "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+            + "<Default Extension=\"xml\" ContentType=\"application/xml\"/>"
+            + "<Override PartName=\"/word/document.xml\" ContentType=\"application/"
+            + "vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>"
+            + "</Types>"),
+        deflated("_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+            + "<Relationship Id=\"rId1\" Target=\"word/document.xml\" Type=\"http://schemas."
+            + "openxmlformats.org/officeDocument/2006/relationships/officeDocument\"/>"
+            + "</Relationships>"),
+        deflated("word/document.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            + "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
+            + "<w:body/></w:document>"));
+  }
+
+  /**
+   * ASiC-S container (ETSI EN 319 162): an uncompressed {@code mimetype} entry goes first.
+   */
+  private static byte[] asicS() {
+    return zip(new ZipFileEntry("mimetype",
+            "application/vnd.etsi.asic-s+zip".getBytes(StandardCharsets.US_ASCII), true),
+        new ZipFileEntry("file.pdf", pdf(), false),
+        new ZipFileEntry("META-INF/signature.p7s", new byte[64], false));
+  }
+
+  private static byte[] jar() {
+    return zip(deflated("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\r\n\r\n"),
+        new ZipFileEntry("com/example/App.class",
+            new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE}, false));
+  }
+
+  private static ZipFileEntry deflated(String name, String content) {
+    return new ZipFileEntry(name, content.getBytes(StandardCharsets.UTF_8), false);
+  }
+
+  @SneakyThrows
+  private static byte[] zip(ZipFileEntry... entries) {
+    final var out = new ByteArrayOutputStream();
+    try (var zip = new ZipOutputStream(out)) {
+      for (ZipFileEntry entry : entries) {
+        final var zipEntry = new ZipEntry(entry.name);
+        if (entry.stored) {
+          final var crc = new CRC32();
+          crc.update(entry.content);
+          zipEntry.setMethod(ZipEntry.STORED);
+          zipEntry.setSize(entry.content.length);
+          zipEntry.setCrc(crc.getValue());
+        }
+        zip.putNextEntry(zipEntry);
+        zip.write(entry.content);
+        zip.closeEntry();
+      }
+    }
+    return out.toByteArray();
+  }
+
+  private static final class ZipFileEntry {
+
+    private final String name;
+    private final byte[] content;
+    private final boolean stored;
+
+    private ZipFileEntry(String name, byte[] content, boolean stored) {
+      this.name = name;
+      this.content = content;
+      this.stored = stored;
+    }
   }
 
   /**
