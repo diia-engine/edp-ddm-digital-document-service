@@ -21,6 +21,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.epam.digital.data.platform.integration.ceph.model.CephObject;
 import com.epam.digital.data.platform.integration.ceph.model.CephObjectMetadata;
 import com.epam.digital.data.platform.integration.ceph.service.CephService;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
@@ -59,10 +60,10 @@ public class TestS3ObjectCephService implements CephService {
     objectMetadata.setContentLength(contentLength);
     objectMetadata.setUserMetadata(userMetadata);
     S3Object s3Object = new S3Object();
-    s3Object.setObjectContent(fileInputStream);
+    // the upload consumes the stream (e.g. a digest-calculating wrapper), so keep a copy of it
+    s3Object.setObjectContent(new ByteArrayInputStream(fileInputStream.readAllBytes()));
     s3Object.setObjectMetadata(objectMetadata);
     storage.put(key, s3Object);
-    fileInputStream.read(new byte[fileInputStream.available()]);
     return toCephObjectMetadata(s3Object.getObjectMetadata());
   }
 

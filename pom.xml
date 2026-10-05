@@ -30,6 +30,8 @@
     <bpms-client.version>1.9.0</bpms-client.version>
     <ddm-starter-kafka.version>1.6.0</ddm-starter-kafka.version>
     <ddm-file-storage.version>1.9.0</ddm-file-storage.version>
+    <!-- overrides the 1.9.0 ddm-file-storage brings: setUserMetadata keeps Content-Type -->
+    <ddm-ceph-client.version>1.9.1</ddm-ceph-client.version>
 
     <!-- JMX port of spring-boot-maven-plugin start/stop; override locally if 9001 is taken -->
     <spring-boot.jmx.port>9001</spring-boot.jmx.port>
@@ -65,6 +67,11 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${jackson-databind.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.epam.digital.data.platform</groupId>
+        <artifactId>ddm-ceph-client</artifactId>
+        <version>${ddm-ceph-client.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

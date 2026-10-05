@@ -26,22 +26,25 @@ import com.epam.digital.data.platform.dgtldcmnt.dto.InternalApiDocumentMetadataD
 import com.epam.digital.data.platform.dgtldcmnt.dto.UploadDocumentFromUserFormDto;
 import com.epam.digital.data.platform.dgtldcmnt.exception.FileCompressionException;
 import com.epam.digital.data.platform.dgtldcmnt.mapper.DocumentMetadataDtoMapper;
-import com.epam.digital.data.platform.storage.file.dto.FileDataDto;
+import com.epam.digital.data.platform.dgtldcmnt.wrapper.Sha256DigestCalculatingInputStream;
+import com.epam.digital.data.platform.storage.file.dto.BaseFileMetadataDto;
 import com.epam.digital.data.platform.storage.file.dto.FileMetadataDto;
+import com.epam.digital.data.platform.storage.file.dto.FileMetadataDto.UserMetadataHeaders;
+import com.epam.digital.data.platform.storage.file.dto.FileObjectDto;
+import com.epam.digital.data.platform.storage.file.service.FileStorageService;
 import com.epam.digital.data.platform.storage.file.service.FormDataFileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.codec.binary.Hex;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +62,7 @@ import java.util.stream.Collectors;
 public class CephDocumentService implements DocumentService {
 
   private final FormDataFileStorageService storage;
+  private final FileStorageService fileStorage;
   private final DocumentMetadataDtoMapper mapper;
   private final List<ImageCompressor> imageCompressors;
 
@@ -71,13 +75,24 @@ public class CephDocumentService implements DocumentService {
 
     compressFile(uploadDocumentDto);
 
-    byte[] data = readBytes(uploadDocumentDto.getFileInputStream());
-    var sha256hex = DigestUtils.sha256Hex(data);
-    var fileMetadata = buildFileMetadata(id, sha256hex, uploadDocumentDto);
-    var fileDataDto = FileDataDto.builder().content(new ByteArrayInputStream(data))
-        .metadata(fileMetadata).build();
-    var savedFileMetadata = storage.save(uploadDocumentDto.getRootProcessInstanceId(), id,
-        fileDataDto);
+    // The file is streamed to the storage with a known length - the S3 client buffers the whole
+    // stream in memory otherwise. The checksum is known only once the stream is read, so it is
+    // added to the user metadata after the upload.
+    var userMetadata = new LinkedHashMap<>(
+        buildFileMetadata(id, uploadDocumentDto).getUserMetadata());
+    var sha256DigestCalculatingIS = new Sha256DigestCalculatingInputStream(
+        uploadDocumentDto.getFileInputStream());
+    var fileObjectDto = FileObjectDto.builder()
+        .content(sha256DigestCalculatingIS)
+        .metadata(new BaseFileMetadataDto(uploadDocumentDto.getSize(),
+            uploadDocumentDto.getContentType(), userMetadata))
+        .build();
+    fileStorage.save(uploadDocumentDto.getRootProcessInstanceId(), id, fileObjectDto);
+
+    var sha256hex = Hex.encodeHexString(sha256DigestCalculatingIS.getDigest());
+    userMetadata.put(UserMetadataHeaders.CHECKSUM.getValue(), sha256hex);
+    var savedFileMetadata = fileStorage.setUserMetadata(
+        uploadDocumentDto.getRootProcessInstanceId(), id, userMetadata);
     var url = generateGetDocumentUrl(id, uploadDocumentDto);
     log.debug("File {} uploaded. Id {}", uploadDocumentDto.getFilename(), id);
     return DocumentMetadataDto.builder()
@@ -173,14 +188,6 @@ public class CephDocumentService implements DocumentService {
         uploadDocumentDto.getFieldName(), fileId);
   }
 
-  private byte[] readBytes(InputStream inputStream) {
-    try {
-      return inputStream.readAllBytes();
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Unable to read bytes", e);
-    }
-  }
-
   private String encodeUtf8(String value) {
     return URLEncoder.encode(value, StandardCharsets.UTF_8);
   }
@@ -191,7 +198,7 @@ public class CephDocumentService implements DocumentService {
         .orElse(null);
   }
 
-  private FileMetadataDto buildFileMetadata(String id, String checksum,
+  private FileMetadataDto buildFileMetadata(String id,
                                             UploadDocumentFromUserFormDto uploadDocumentDto) {
     return FileMetadataDto.builder()
         .filename(encodeUtf8(uploadDocumentDto.getFilename()))
@@ -199,7 +206,6 @@ public class CephDocumentService implements DocumentService {
         .contentLength(uploadDocumentDto.getSize())
         .fieldName(uploadDocumentDto.getFieldName())
         .formKey(uploadDocumentDto.getFormKey())
-        .checksum(checksum)
         .imageMaxWidth(uploadDocumentDto.getImageMaxWidth())
         .imageMaxHeight(uploadDocumentDto.getImageMaxHeight())
         .compressionQuality(uploadDocumentDto.getCompressionQuality())
